@@ -81,7 +81,6 @@ export default function App() {
     [CounterExecutor.module],
   );
 
-
   const checkModuleInstalled = ({
     module,
     onModuleInstalled,
