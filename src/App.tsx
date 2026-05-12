@@ -81,27 +81,32 @@ export default function App() {
     [CounterExecutor.module],
   );
 
-  const checkModuleInstalled = ({
-    module,
-    onModuleInstalled,
-    onModuleNotInstalled,
-    onError,
-  }: {
-    module: IsModuleInstalledParameters<SmartAccount>;
-    onModuleInstalled?: () => any;
-    onModuleNotInstalled?: () => any;
-    onError?: (reason: any) => any;
-  }) =>
-    smartAccountClient!
-      .isModuleInstalled(module)
-      .then(
-        (isModuleInstalled) => {
-          setIsModuleInstalled(() => isModuleInstalled);
-          if (isModuleInstalled) onModuleInstalled?.();
-          else onModuleNotInstalled?.();
-        }
-      )
-      .catch(onError);
+  const checkModuleInstalled = useCallback(
+    ({
+      module,
+      onModuleInstalled,
+      onModuleNotInstalled,
+      onError,
+    }: {
+      module: IsModuleInstalledParameters<SmartAccount>;
+      onModuleInstalled?: () => any;
+      onModuleNotInstalled?: () => any;
+      onError?: (reason: any) => any;
+    }) =>
+      smartAccountClient
+        ? smartAccountClient
+          .isModuleInstalled(module)
+          .then(
+            (isModuleInstalled) => {
+              setIsModuleInstalled(() => isModuleInstalled);
+              if (isModuleInstalled) onModuleInstalled?.();
+              else onModuleNotInstalled?.();
+            }
+          )
+          .catch(onError)
+        : undefined,
+    [smartAccountClient],
+  );
 
   useEffect(
     () => {
@@ -118,33 +123,36 @@ export default function App() {
     [counterExecutorModule, smartAccountClient],
   );
 
-  async function installCounterExecutorModule() {
-    const opHash = await smartAccountClient!.installModule(CounterExecutor.module!);
-    const receipt = await pimlicoClient.waitForUserOperationReceipt({
-      hash: opHash,
-    });
-
-    const { transactionHash } = (
-      await pimlicoClient.request({
-        method: "eth_getUserOperationByHash",
-        params: [receipt.userOpHash],
-      })
-    )!;
-
-    const { status } = await publicClient.waitForTransactionReceipt({
-      hash: transactionHash,
-    });
-
-    if (status === "success") {
-      await checkModuleInstalled({
-        module: CounterExecutor.module!,
-        onError: console.error,
+  const installCounterExecutorModule = useCallback(
+    async () => {
+      const opHash = await smartAccountClient!.installModule(CounterExecutor.module!);
+      const receipt = await pimlicoClient.waitForUserOperationReceipt({
+        hash: opHash,
       });
-      return transactionHash;
-    }
 
-    throw { installCounterExecutorModuleStatus: status };
-  };
+      const { transactionHash } = (
+        await pimlicoClient.request({
+          method: "eth_getUserOperationByHash",
+          params: [receipt.userOpHash],
+        })
+      )!;
+
+      const { status } = await publicClient.waitForTransactionReceipt({
+        hash: transactionHash,
+      });
+
+      if (status === "success") {
+        await checkModuleInstalled({
+          module: CounterExecutor.module!,
+          onError: console.error,
+        });
+        return transactionHash;
+      }
+
+      throw { installCounterExecutorModuleStatus: status };
+    },
+    [smartAccountClient, CounterExecutor.module],
+  );
 
   const getCount = useCallback(
     (account: SmartAccount) =>
@@ -159,16 +167,19 @@ export default function App() {
     [CounterExecutor.module],
   );
 
-  async function onIncrementCount() {
-    const hash = await smartAccountClient!.sendTransaction({
-      callData: encodeExecuteSingle(incrementCount!),
-    });
+  const onIncrementCount = useCallback(
+    async () => {
+      const hash = await smartAccountClient!.sendTransaction({
+        callData: encodeExecuteSingle(incrementCount!),
+      });
 
-    const { status } = await publicClient.waitForTransactionReceipt({ hash });
+      const { status } = await publicClient.waitForTransactionReceipt({ hash });
 
-    if (status == "success") return hash;
-    throw { incrementCountStatus: status };
-  }
+      if (status == "success") return hash;
+      throw { incrementCountStatus: status };
+    },
+    [smartAccountClient],
+  );
   //#endregion
 
   useEffect(
@@ -214,7 +225,7 @@ export default function App() {
   return <>
     <section id="center" className="relative">
       {isConnected && <div className="absolute top-3.25 right-3.25 z-50">
-        <DynamicWidget variant="dropdown" />
+        <DynamicWidget />
       </div>}
 
       <div className="hero">
@@ -243,7 +254,7 @@ export default function App() {
 
         {/* Connect Button */}
         {sdkHasLoaded && !isConnected &&
-          <DynamicWidget variant="modal" />
+          <DynamicWidget />
         }
 
         {/* Install Module */}
