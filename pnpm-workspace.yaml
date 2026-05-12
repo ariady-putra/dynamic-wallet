@@ -1,0 +1,10 @@
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 1440
+minimumReleaseAge: 1440
+allowBuilds:
+  bigint-buffer: true
+  bufferutil: true
+  sharp: true
+  tsl-apple-cloudkit: true
+  utf-8-validate: true
