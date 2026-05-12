@@ -175,10 +175,10 @@ export default function App() {
 
       const { status } = await publicClient.waitForTransactionReceipt({ hash });
 
-      if (status == "success") return hash;
+      if (status === "success") return hash;
       throw { incrementCountStatus: status };
     },
-    [smartAccountClient],
+    [smartAccountClient, incrementCount],
   );
   //#endregion
 
@@ -245,7 +245,8 @@ export default function App() {
             //   ? "Please complete the onboarding process."
             : isUserLoggedIn
               ? "You are logged in!"
-              : "Please log in to continue."}
+              : "Please log in to continue."
+          }
         </p>
       </div>
 
@@ -260,7 +261,7 @@ export default function App() {
         {/* Install Module */}
         {smartAccountClient && counterExecutorModule && isModuleInstalled === false &&
           <button
-            className={`btn ${isLoading ? "pointer-events-none" : "btn-primary"}`}
+            className={`btn ${!isLoading ? "btn-primary" : "pointer-events-none"}`}
             onClick={() => act({
               perform: installCounterExecutorModule,
               onSuccess: (txHash) =>
@@ -276,14 +277,13 @@ export default function App() {
         {/* Increment Count */}
         {smartAccountClient && counterExecutorModule && isModuleInstalled &&
           <button
-            className={`btn ${isLoading ? "pointer-events-none" : "btn-primary"}`}
+            className={`btn ${!isLoading ? "btn-primary" : "pointer-events-none"}`}
             onClick={() => act({
               perform: onIncrementCount,
               onSuccess: (txHash) => {
                 setResult(() => `Increment count: https://sepolia-optimism.etherscan.io/tx/${txHash}`);
 
-                if (!smartAccount) return;
-                setTimeout(
+                if (smartAccount) setTimeout(
                   () => {
                     getCount(smartAccount)?.then(
                       (count) =>

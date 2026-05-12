@@ -22,7 +22,7 @@ export const publicClient = createPublicClient({
 export const config = createConfig({
   chains: [optimismSepolia],
   transports: {
-    [optimismSepolia.id]: http(import.meta.env.VITE_ALCHEMY_RPC_URL)
+    [optimismSepolia.id]: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
   },
   multiInjectedProviderDiscovery: false,
 });
