@@ -146,13 +146,18 @@ export default function App() {
     throw { installCounterExecutorModuleStatus: status };
   };
 
-  const getCount = (account: SmartAccount) =>
-    publicClient.readContract({
-      address: CounterExecutor.module!.address,
-      abi: CounterExecutor.abi,
-      functionName: "getCount",
-      account,
-    });
+  const getCount = useCallback(
+    (account: SmartAccount) =>
+      CounterExecutor.module
+        ? publicClient.readContract({
+          address: CounterExecutor.module.address,
+          abi: CounterExecutor.abi,
+          functionName: "getCount",
+          account,
+        })
+        : undefined,
+    [CounterExecutor.module],
+  );
 
   async function onIncrementCount() {
     const hash = await smartAccountClient!.sendTransaction({
@@ -165,6 +170,20 @@ export default function App() {
     throw { incrementCountStatus: status };
   }
   //#endregion
+
+  useEffect(
+    () => {
+      if (result) return;
+      if (!smartAccount) return;
+      if (!CounterExecutor.module) return;
+
+      getCount(smartAccount)?.then(
+        (count) =>
+          setResult(() => `Count: ${count}`)
+      ).catch(setResultError);
+    },
+    [CounterExecutor.module, smartAccount, result],
+  );
 
   const act = useCallback(
     <TxHash extends Hex>({
@@ -255,12 +274,10 @@ export default function App() {
                 if (!smartAccount) return;
                 setTimeout(
                   () => {
-                    getCount(smartAccount)
-                      .then(
-                        (count) =>
-                          setResult(() => `Count: ${count}`)
-                      )
-                      .catch(setResultError);
+                    getCount(smartAccount)?.then(
+                      (count) =>
+                        setResult(() => `Count: ${count}`)
+                    ).catch(setResultError);
                   },
                   12_000,
                 );
