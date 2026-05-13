@@ -14,10 +14,12 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <WagmiProvider config={config}>
       <QueryClientProvider client={new QueryClient()}>
-        <DynamicContextProvider settings={{
-          environmentId: import.meta.env.VITE_DYNAMIC_ENV_ID,
-          walletConnectors: [EthereumWalletConnectors],
-        }}>
+        <DynamicContextProvider
+          settings={{
+            environmentId: import.meta.env.VITE_DYNAMIC_ENV_ID,
+            walletConnectors: [EthereumWalletConnectors],
+          }}
+        >
           <DynamicWagmiConnector>
             <App />
           </DynamicWagmiConnector>
