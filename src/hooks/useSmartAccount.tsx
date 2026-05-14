@@ -72,10 +72,9 @@ export function useSmartAccount({
 
   const smartAccountClient = useMemo(
     () => {
-      return account
+      return account && chain
         ? createSmartAccountClient({
-          account,
-          chain,
+          account, chain,
           bundlerTransport: http(import.meta.env.VITE_PIMLICO_RPC_URL),
           paymaster: pimlicoClient,
           userOperation: {
