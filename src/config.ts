@@ -3,6 +3,12 @@ import { createPublicClient, http, walletActions, type Address } from "viem";
 import { optimismSepolia } from "viem/chains";
 import { entryPoint07Address } from "viem/account-abstraction";
 import { createPimlicoClient } from "permissionless/clients/pimlico";
+import CounterExecutorModuleJSON from "../CounterExecutorModule.json" with {type: "json"};
+
+export const CounterExecutorModule = {
+  ...CounterExecutorModuleJSON,
+  address: "0x402A5947e74A234728fce825740D375Da4C80064" as Address,
+};
 
 export const entryPoint: { address: Address; version: "0.7"; } = {
   address: entryPoint07Address,

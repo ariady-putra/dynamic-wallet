@@ -1,35 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { http, useConnection, useWalletClient, type Transport } from "wagmi";
-import type { Chain, Client, EntryPointVersion, JsonRpcAccount, LocalAccount, RpcSchema } from "viem";
-import type { SmartAccount } from "viem/account-abstraction";
+import { http, useConnection, useWalletClient } from "wagmi";
 import { createSmartAccountClient } from "permissionless";
-import { toNexusSmartAccount, type ToNexusSmartAccountReturnType } from "permissionless/accounts";
+import { getMEEVersion, MEEVersion, toNexusAccount, type GenericModuleConfig, type NexusAccount, type PrevalidationHookModuleConfig, type ToDefaultModuleParameters, type Validator } from "@biconomy/abstractjs";
 import { erc7579Actions } from "permissionless/actions/erc7579";
-import type { PimlicoClient } from "permissionless/clients/pimlico";
+import { pimlicoClient } from "../config";
+import type { Hex } from "viem";
 
-export default function useSmartAccount({
-  publicClient,
-  pimlicoClient,
+export function useSmartAccount({
+  validators,
+  executors,
+  prevalidationHooks,
+  hook,
+  fallbacks,
+  initData,
+  defaultModuleParameters,
   onError,
 }: {
-  publicClient: Client<
-    Transport,
-    Chain | undefined,
-    JsonRpcAccount | LocalAccount | undefined
-  >;
-  pimlicoClient: PimlicoClient<
-    EntryPointVersion,
-    Transport,
-    Chain | undefined,
-    SmartAccount | undefined,
-    Client | undefined,
-    RpcSchema | undefined
-  >;
-  onError?: (reason: any) => any;
+  /** Optional validator modules configuration */
+  validators?: Array<Validator>;
+  /** Optional executor modules configuration */
+  executors?: Array<GenericModuleConfig>;
+  /** Optional prevalidation hook modules configuration */
+  prevalidationHooks?: Array<PrevalidationHookModuleConfig>;
+  /** Optional hook module configuration */
+  hook?: GenericModuleConfig;
+  /** Optional fallback modules configuration */
+  fallbacks?: Array<GenericModuleConfig>;
+  /** Optional init data */
+  initData?: Hex;
+  /** Optional default module parameters */
+  defaultModuleParameters?: Partial<ToDefaultModuleParameters>;
+  /** Optional error handler */
+  onError?: (reason: unknown) => unknown;
 }) {
   const { address, isConnected, chain } = useConnection();
   const { data: owner } = useWalletClient();
-  const [account, setAccount] = useState<ToNexusSmartAccountReturnType>();
+  const [account, setAccount] = useState<NexusAccount>();
 
   useEffect(
     () => {
@@ -40,17 +46,28 @@ export default function useSmartAccount({
 
       if (account) return;
       if (!owner) return;
+      if (!chain) return;
 
-      toNexusSmartAccount({
-        client: publicClient,
-        owners: [owner],
-        version: "1.0.0",
+      toNexusAccount({
+        signer: owner,
+        chainConfiguration: {
+          chain,
+          transport: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
+          version: getMEEVersion(MEEVersion.V3_0_0),
+        },
+        validators,
+        executors,
+        prevalidationHooks,
+        hook,
+        fallbacks,
+        initData,
+        defaultModuleParameters,
       }).then(
         (account) =>
           setAccount(() => isConnected ? account : undefined)
       ).catch(onError);
     },
-    [owner, account, isConnected],
+    [owner, account, chain, isConnected],
   );
 
   const smartAccountClient = useMemo(
@@ -70,7 +87,7 @@ export default function useSmartAccount({
         )
         : undefined;
     },
-    [account, chain, pimlicoClient],
+    [account, chain],
   );
 
   return {

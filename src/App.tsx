@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnection } from "wagmi";
-import type { Hex } from "viem";
+import type { WaitForTransactionReceiptReturnType } from "viem";
 import type { SmartAccount } from "viem/account-abstraction";
-import type { InstallModuleParameters, IsModuleInstalledParameters } from "permissionless/actions/erc7579";
 import { DynamicWidget, useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
-import { pimlicoClient, publicClient } from "./config";
+
 import { encodeExecuteSingle, type Action } from "./erc7579/utils";
-import useSmartAccount from "./hooks/useSmartAccount";
-import CounterExecutorModuleJSON from "../CounterExecutorModule.json" with {type: "json"};
+import { waitForNextBlock } from "./utils";
+
+import { useSmartAccount } from "./hooks/useSmartAccount";
+import { CounterExecutorModule, publicClient } from "./config";
 
 import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
@@ -23,8 +24,10 @@ export default function App() {
   const isUserLoggedIn = useIsLoggedIn();
   const { address, isConnected, chain } = useConnection();
   const { account: smartAccount, client: smartAccountClient } = useSmartAccount({
-    publicClient,
-    pimlicoClient,
+    executors: [{
+      module: CounterExecutorModule.address,
+      data: address ?? "0x", // owner address
+    }],
     onError: console.error,
   });
 
@@ -41,186 +44,68 @@ export default function App() {
   );
 
   //#region Module
-  const [isModuleInstalled, setIsModuleInstalled] = useState<boolean>();
-
-  const counterExecutorModule: InstallModuleParameters<SmartAccount> | undefined = useMemo(
-    () =>
-      address
-        ? {
-          type: "executor",
-          address: "0x402A5947e74A234728fce825740D375Da4C80064",
-          context: address,
-        }
-        : undefined,
-    [address],
-  );
-
-  const CounterExecutor = useMemo(
-    () => {
-      return {
-        ...CounterExecutorModuleJSON,
-        module: counterExecutorModule
-      };
+  const incrementCount: Action = {
+    target: CounterExecutorModule.address,
+    value: 0n,
+    data: {
+      abi: CounterExecutorModule.abi,
+      functionName: "incrementCount",
     },
-    [counterExecutorModule],
-  );
+  };
 
-  const incrementCount: Action | undefined = useMemo(
-    () => {
-      return CounterExecutor.module
-        ? {
-          target: CounterExecutor.module.address,
-          value: 0n,
-          data: {
-            abi: CounterExecutor.abi,
-            functionName: "incrementCount",
-          },
-        }
-        : undefined;
-    },
-    [CounterExecutor.module],
-  );
+  const execIncrementCount = async () =>
+    smartAccountClient
+      ? publicClient.waitForTransactionReceipt({
+        hash: await smartAccountClient.sendTransaction({
+          callData: encodeExecuteSingle(incrementCount),
+        }),
+      })
+      : undefined;
 
-  const checkModuleInstalled = useCallback(
-    ({
-      module,
-      onModuleInstalled,
-      onModuleNotInstalled,
-      onError,
-    }: {
-      module: IsModuleInstalledParameters<SmartAccount>;
-      onModuleInstalled?: () => any;
-      onModuleNotInstalled?: () => any;
-      onError?: (reason: any) => any;
-    }) =>
-      smartAccountClient
-        ? smartAccountClient
-          .isModuleInstalled(module)
-          .then(
-            (isModuleInstalled) => {
-              setIsModuleInstalled(() => isModuleInstalled);
-              if (isModuleInstalled) onModuleInstalled?.();
-              else onModuleNotInstalled?.();
-            }
-          )
-          .catch(onError)
-        : undefined,
-    [smartAccountClient],
-  );
-
-  useEffect(
-    () => {
-      if (!smartAccountClient) return;
-      if (!counterExecutorModule) return;
-
-      checkModuleInstalled({
-        module: counterExecutorModule,
-        onModuleNotInstalled: () =>
-          setResult(() => "Please install module to continue."),
-        onError: console.error,
-      });
-    },
-    [counterExecutorModule, smartAccountClient],
-  );
-
-  const installCounterExecutorModule = useCallback(
-    async () => {
-      const opHash = await smartAccountClient!.installModule(CounterExecutor.module!);
-      const receipt = await pimlicoClient.waitForUserOperationReceipt({
-        hash: opHash,
-      });
-
-      const { transactionHash } = (
-        await pimlicoClient.request({
-          method: "eth_getUserOperationByHash",
-          params: [receipt.userOpHash],
-        })
-      )!;
-
-      const { status } = await publicClient.waitForTransactionReceipt({
-        hash: transactionHash,
-      });
-
-      if (status === "success") {
-        await checkModuleInstalled({
-          module: CounterExecutor.module!,
-          onError: console.error,
-        });
-        return transactionHash;
-      }
-
-      throw { installCounterExecutorModuleStatus: status };
-    },
-    [smartAccountClient, CounterExecutor.module],
-  );
-
-  const getCount = useCallback(
-    (account: SmartAccount) =>
-      CounterExecutor.module
-        ? publicClient.readContract({
-          address: CounterExecutor.module.address,
-          abi: CounterExecutor.abi,
-          functionName: "getCount",
-          account,
-        })
-        : undefined,
-    [CounterExecutor.module],
-  );
-
-  const onIncrementCount = useCallback(
-    async () => {
-      const hash = await smartAccountClient!.sendTransaction({
-        callData: encodeExecuteSingle(incrementCount!),
-      });
-
-      const { status } = await publicClient.waitForTransactionReceipt({ hash });
-
-      if (status === "success") return hash;
-      throw { incrementCountStatus: status };
-    },
-    [smartAccountClient, incrementCount],
-  );
+  const getCount = (account: SmartAccount) =>
+    publicClient.readContract({
+      address: CounterExecutorModule.address,
+      abi: CounterExecutorModule.abi,
+      functionName: "getCount",
+      account,
+    });
   //#endregion
 
   useEffect(
     () => {
       if (result) return;
       if (!smartAccount) return;
-      if (!CounterExecutor.module) return;
 
       getCount(smartAccount)?.then(
         (count) =>
           setResult(() => `Count: ${count}`)
       ).catch(setResultError);
     },
-    [CounterExecutor.module, smartAccount, result],
+    [smartAccount, result],
   );
 
-  const act = useCallback(
-    <TxHash extends Hex>({
-      perform,
-      onSuccess,
-      onError,
-    }: {
-      perform: () => Promise<TxHash>;
-      onSuccess?: (txHash: TxHash) => any;
-      onError?: (reason: any) => any;
-    }) => {
-      if (isLoading) return;
+  function act<Receipt extends WaitForTransactionReceiptReturnType | undefined>({
+    perform,
+    onSuccess,
+    onError,
+  }: {
+    perform: () => Promise<Receipt>;
+    onSuccess?: (receipt: Receipt) => unknown;
+    onError?: (reason: unknown) => unknown;
+  }) {
+    if (isLoading) return;
 
-      setIsLoading(() => true);
-      setResult(() => "Signing message...");
+    setIsLoading(() => true);
+    setResult(() => "Signing message...");
 
-      perform()
-        .then(onSuccess)
-        .catch(onError)
-        .finally(
-          () =>
-            setIsLoading(() => false)
-        );
-    },
-    [isLoading],
-  );
+    perform()
+      .then(onSuccess)
+      .catch(onError)
+      .finally(
+        () =>
+          setIsLoading(() => false)
+      );
+  }
 
   return <>
     <section id="center" className="relative">
@@ -238,60 +123,51 @@ export default function App() {
         <h1 className="text-3xl font-bold underline">
           Hello {address?.slice(0, 6)}...{address?.slice(-4)}
         </h1>
-        <p>
-          {!sdkHasLoaded
-            ? "loading..."
-            // : userWithMissingInfo
-            //   ? "Please complete the onboarding process."
-            : isUserLoggedIn
-              ? "You are logged in!"
-              : "Please log in to continue."
-          }
-        </p>
+        {!sdkHasLoaded && <p>loading...</p>}
+        {sdkHasLoaded && !isUserLoggedIn && <p>Please log in to continue.</p>}
+        {sdkHasLoaded && isUserLoggedIn && !isConnected && <p>connecting...</p>}
+        {sdkHasLoaded && isUserLoggedIn && isConnected && <p>You are logged in!</p>}
       </div>
 
       <div className="relative h-10.25">
         <div className="absolute loading loading-infinity my-auto top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-50" />
 
         {/* Connect Button */}
-        {sdkHasLoaded && !isConnected &&
+        {sdkHasLoaded && !isUserLoggedIn &&
           <DynamicWidget />
         }
 
-        {/* Install Module */}
-        {smartAccountClient && counterExecutorModule && isModuleInstalled === false &&
-          <button
-            className={`btn ${!isLoading ? "btn-primary" : "pointer-events-none"}`}
-            onClick={() => act({
-              perform: installCounterExecutorModule,
-              onSuccess: (txHash) =>
-                setResult(() => `Install module: https://sepolia-optimism.etherscan.io/tx/${txHash}`),
-              onError: setResultError,
-            })}
-          >
-            {isLoading && <span className="loading" />}
-            {!isLoading ? "Install Module" : "Installing Module"}
-          </button>
-        }
-
         {/* Increment Count */}
-        {smartAccountClient && counterExecutorModule && isModuleInstalled &&
+        {smartAccountClient &&
           <button
             className={`btn ${!isLoading ? "btn-primary" : "pointer-events-none"}`}
             onClick={() => act({
-              perform: onIncrementCount,
-              onSuccess: (txHash) => {
-                setResult(() => `Increment count: https://sepolia-optimism.etherscan.io/tx/${txHash}`);
+              perform: execIncrementCount,
+              onSuccess: (receipt) => {
+                if (!receipt) {
+                  setResultError("Failed to execute increment count.");
+                  return;
+                }
 
-                if (smartAccount) setTimeout(
-                  () => {
-                    getCount(smartAccount)?.then(
-                      (count) =>
-                        setResult(() => `Count: ${count}`)
-                    ).catch(setResultError);
-                  },
-                  12_000,
-                );
+                if (receipt.status !== "success") {
+                  setResultError({ incrementCountStatus: receipt.status });
+                  return;
+                }
+
+                const txHash = `Increment count: https://sepolia-optimism.etherscan.io/tx/${receipt.transactionHash}`;
+                setResult(() => txHash);
+
+                if (smartAccount) waitForNextBlock(receipt.blockNumber)
+                  .then(
+                    () =>
+                      getCount(smartAccount)
+                  )
+                  .then(
+                    (count) => {
+                      if (count) setResult(() => `Count: ${count} - ${txHash}`);
+                    }
+                  )
+                  .catch(setResultError);
               },
               onError: setResultError,
             })}
