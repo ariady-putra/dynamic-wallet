@@ -76,10 +76,12 @@ export default function App() {
       if (result) return;
       if (!smartAccount) return;
 
-      getCount(smartAccount)?.then(
-        (count) =>
-          setResult(() => `Count: ${count}`)
-      ).catch(setResultError);
+      getCount(smartAccount)
+        .then(
+          (count) =>
+            setResult(() => `Count: ${count}`)
+        )
+        .catch(setResultError);
     },
     [smartAccount, result],
   );
@@ -109,9 +111,11 @@ export default function App() {
 
   return <>
     <section id="center" className="relative">
-      {isConnected && <div className="absolute top-3.25 right-3.25 z-50">
-        <DynamicWidget />
-      </div>}
+      {isConnected &&
+        <div className="absolute top-3.25 right-3.25 z-50">
+          <DynamicWidget />
+        </div>
+      }
 
       <div className="hero">
         <img src={heroImg} className="base" width="170" height="179" alt="" />
@@ -141,36 +145,37 @@ export default function App() {
         {smartAccountClient &&
           <button
             className={`btn ${!isLoading ? "btn-primary" : "pointer-events-none"}`}
-            onClick={() => act({
-              perform: execIncrementCount,
-              onSuccess: (receipt) => {
-                if (!receipt) {
-                  setResultError("Failed to execute increment count.");
-                  return;
-                }
+            onClick={
+              () => act({
+                perform: execIncrementCount,
+                onSuccess: (receipt) => {
+                  if (!receipt) {
+                    setResultError("System not ready, please try again in a moment.");
+                    return;
+                  }
 
-                if (receipt.status !== "success") {
-                  setResultError({ incrementCountStatus: receipt.status });
-                  return;
-                }
+                  if (receipt.status !== "success") {
+                    setResultError({ incrementCountStatus: receipt.status });
+                    return;
+                  }
 
-                const txHash = `Increment count: https://sepolia-optimism.etherscan.io/tx/${receipt.transactionHash}`;
-                setResult(() => txHash);
+                  const txHash = `Increment count: https://sepolia-optimism.etherscan.io/tx/${receipt.transactionHash}`;
+                  setResult(() => txHash);
 
-                if (smartAccount) waitForNextBlock(receipt.blockNumber)
-                  .then(
-                    () =>
-                      getCount(smartAccount)
-                  )
-                  .then(
-                    (count) => {
-                      if (count) setResult(() => `Count: ${count} - ${txHash}`);
-                    }
-                  )
-                  .catch(setResultError);
-              },
-              onError: setResultError,
-            })}
+                  if (smartAccount) waitForNextBlock(receipt.blockNumber)
+                    .then(
+                      () =>
+                        getCount(smartAccount)
+                    )
+                    .then(
+                      (count) =>
+                        setResult(() => `Count: ${count} - ${txHash}`)
+                    )
+                    .catch(setResultError);
+                },
+                onError: setResultError,
+              })
+            }
           >
             {isLoading && <span className="loading" />}
             {!isLoading ? "Increment Count" : "Incrementing Count"}
