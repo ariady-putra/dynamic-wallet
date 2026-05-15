@@ -76,12 +76,10 @@ export default function App() {
       if (result) return;
       if (!smartAccount) return;
 
-      getCount(smartAccount)
-        .then(
-          (count) =>
-            setResult(() => `Count: ${count}`)
-        )
-        .catch(setResultError);
+      getCount(smartAccount).then(
+        (count) =>
+          setResult(() => `Count: ${count}`)
+      ).catch(setResultError);
     },
     [smartAccount, result],
   );
@@ -162,16 +160,14 @@ export default function App() {
                   const txHash = `Increment count: https://sepolia-optimism.etherscan.io/tx/${receipt.transactionHash}`;
                   setResult(() => txHash);
 
-                  if (smartAccount) waitForNextBlock(receipt.blockNumber)
-                    .then(
-                      () =>
-                        getCount(smartAccount)
-                    )
-                    .then(
-                      (count) =>
-                        setResult(() => `Count: ${count} - ${txHash}`)
-                    )
-                    .catch(setResultError);
+                  if (smartAccount) waitForNextBlock({
+                    currentBlock: receipt.blockNumber,
+                    onNextBlock: () =>
+                      getCount(smartAccount).then(
+                        (count) =>
+                          setResult(() => `Count: ${count} - ${txHash}`)
+                      ).catch(console.error),
+                  }).catch(console.error);
                 },
                 onError: setResultError,
               })
