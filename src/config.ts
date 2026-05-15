@@ -1,13 +1,13 @@
 import { createConfig } from "wagmi";
 import { createPublicClient, http, walletActions, type Address } from "viem";
-import { optimismSepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 import { entryPoint07Address } from "viem/account-abstraction";
 import { createPimlicoClient } from "permissionless/clients/pimlico";
 import CounterExecutorModuleJSON from "../CounterExecutorModule.json" with {type: "json"};
 
 export const CounterExecutorModule = {
   ...CounterExecutorModuleJSON,
-  address: "0x402A5947e74A234728fce825740D375Da4C80064" as Address,
+  address: "0x6f77567101a95077E14e5E6eAB27214B6a9B556F" as Address,
 };
 
 export const entryPoint: { address: Address; version: "0.7"; } = {
@@ -21,14 +21,14 @@ export const pimlicoClient = createPimlicoClient({
 });
 
 export const publicClient = createPublicClient({
-  chain: optimismSepolia,
+  chain: baseSepolia,
   transport: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
 }).extend(walletActions);
 
 export const config = createConfig({
-  chains: [optimismSepolia],
+  chains: [baseSepolia],
   transports: {
-    [optimismSepolia.id]: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
+    [baseSepolia.id]: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
   },
   multiInjectedProviderDiscovery: false,
 });

@@ -157,7 +157,7 @@ export default function App() {
                     return;
                   }
 
-                  const txHash = `Increment count: https://sepolia-optimism.etherscan.io/tx/${receipt.transactionHash}`;
+                  const txHash = `Increment count: ${import.meta.env.VITE_EXPLORER}/tx/${receipt.transactionHash}`;
                   setResult(() => txHash);
 
                   if (smartAccount) waitForNextBlock({
