@@ -53,7 +53,7 @@ export function useSmartAccount({
         chainConfiguration: {
           chain,
           transport: http(import.meta.env.VITE_ALCHEMY_RPC_URL),
-          version: getMEEVersion(MEEVersion.V3_0_0),
+          version: getMEEVersion(MEEVersion.V2_3_0),
         },
         validators,
         executors,
